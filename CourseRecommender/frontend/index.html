@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Engineering Course Recommender</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
+</head>
+<body onload="loadSession()">
+  <div class="slideshow"></div>
+
+  <div class="container">
+    <div class="banner-wrapper">
+      <img id="courseImage" src="assets/default.jpg" alt="Engineering Banner" class="fade-banner">
+    </div>
+
+    <h2 id="typedText"></h2>
+
+    <form onsubmit="event.preventDefault(); recommend(false);">
+      <input type="text" id="name" placeholder="Enter your name" required><br><br>
+
+      <select id="branch" onchange="showSuggestions()" required>
+        <option value="">Select your branch</option>
+        <option value="cse">Computer Science</option>
+        <option value="ece">Electronics & Communication</option>
+        <option value="mech">Mechanical Engineering</option>
+        <option value="civil">Civil Engineering</option>
+        <option value="eee">Electrical Engineering</option>
+      </select><br><br>
+
+      <div id="interestSuggestions"></div>
+
+      <textarea id="input" placeholder="Enter your interests..." required></textarea><br>
+
+      <button type="submit">🎯 Recommend</button>
+      <button type="button" onclick="recommend(true)">➕ One More Course</button>
+      <button type="button" onclick="startVoiceInput()">🎤 Voice Input</button>
+      <button type="button" onclick="downloadPDF()">⬇️ Save as PDF</button>
+      <button type="button" onclick="toggleDarkMode()">🌓 Toggle Dark Mode</button>
+    </form>
+
+    <div id="loader" class="spinner" style="display: none;"></div>
+    <ul id="results"></ul>
+    <div id="toast" class="toast"></div>
+  </div>
+
+  <script>
+    const text = "Career Recommender for Engineers";
+    let i = 0;
+    function typeTitle() {
+      if (i < text.length) {
+        document.getElementById("typedText").innerHTML += text.charAt(i);
+        i++;
+        setTimeout(typeTitle, 60);
+      }
+    }
+    typeTitle();
+
+    function showSuggestions() {
+      const branch = document.getElementById("branch").value;
+      const suggestions = {
+        cse: "💡 Try: Java, ML, Web Dev, AI",
+        ece: "💡 Try: IoT, Signal Processing, VLSI",
+        mech: "💡 Try: CAD, Robotics, 3D Printing",
+        civil: "💡 Try: AutoCAD, GIS, Smart Cities",
+        eee: "💡 Try: EV, Power Systems, Grids"
+      };
+      const images = {
+        cse: "assets/cse.jpg",
+        ece: "assets/ece.jpg",
+        mech: "assets/mech.jpg",
+        civil: "assets/civil.jpg",
+        eee: "assets/eee.jpg"
+      };
+      document.getElementById("interestSuggestions").textContent = suggestions[branch] || "";
+      const img = document.getElementById("courseImage");
+      img.style.opacity = 0;
+      setTimeout(() => {
+        img.src = images[branch] || "assets/default.jpg";
+        img.classList.remove("fade-banner");
+        void img.offsetWidth;
+        img.classList.add("fade-banner");
+      }, 200);
+    }
+
+    function recommend(another) {
+      const name = document.getElementById("name").value;
+      const branch = document.getElementById("branch").value;
+      const interests = document.getElementById("input").value;
+
+      saveSession();
+
+      document.getElementById("loader").style.display = "block";
+
+      fetch("http://localhost:5000/recommend", {
+        method: "POST",
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, branch, interests, another })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("loader").style.display = "none";
+        const ul = document.getElementById("results");
+        if (!another) ul.innerHTML = "";
+        data.recommendations.forEach(course => {
+          const li = document.createElement("li");
+          li.innerText = course;
+          ul.appendChild(li);
+        });
+        showToast("Courses recommended successfully!");
+      })
+      .catch(err => {
+        document.getElementById("loader").style.display = "none";
+        showToast("Error fetching recommendations.");
+        console.error(err);
+      });
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.style.visibility = "visible";
+      toast.style.animation = "fadeOut 3s forwards";
+    }
+
+    function startVoiceInput() {
+      const recognition = new webkitSpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.onresult = function(event) {
+        document.getElementById("input").value = event.results[0][0].transcript;
+      };
+      recognition.start();
+    }
+
+    function toggleDarkMode() {
+      document.body.classList.toggle("dark");
+    }
+
+    function downloadPDF() {
+      const element = document.getElementById("results");
+      html2pdf().from(element).save("course_recommendations.pdf");
+    }
+
+    function saveSession() {
+      localStorage.setItem("name", document.getElementById("name").value);
+      localStorage.setItem("branch", document.getElementById("branch").value);
+      localStorage.setItem("interests", document.getElementById("input").value);
+    }
+
+    function loadSession() {
+      document.getElementById("name").value = localStorage.getItem("name") || "";
+      document.getElementById("branch").value = localStorage.getItem("branch") || "";
+      document.getElementById("input").value = localStorage.getItem("interests") || "";
+      showSuggestions();
+    }
+  </script>
+</body>
+</html>
